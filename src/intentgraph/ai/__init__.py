@@ -13,6 +13,15 @@ Core Philosophy:
 """
 
 from .agent import CodebaseAgent
+from .enhanced_agent import (
+    EnhancedCodebaseAgent,
+    CallChain,
+    CallChainNode,
+    EntryPoint,
+    CodeLocation,
+    ArchitectureMap,
+    ModuleBoundaries
+)
 from .manifest import get_capabilities_manifest
 from .query import SemanticQuery, QueryBuilder
 from .response import ResponseOptimizer, TokenBudget
@@ -20,7 +29,14 @@ from .navigation import AutonomousNavigator
 
 __all__ = [
     'CodebaseAgent',
-    'get_capabilities_manifest', 
+    'EnhancedCodebaseAgent',
+    'CallChain',
+    'CallChainNode',
+    'EntryPoint',
+    'CodeLocation',
+    'ArchitectureMap',
+    'ModuleBoundaries',
+    'get_capabilities_manifest',
     'SemanticQuery',
     'QueryBuilder',
     'ResponseOptimizer',

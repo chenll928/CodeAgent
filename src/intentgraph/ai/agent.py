@@ -237,7 +237,61 @@ class CodebaseAgent:
     def get_token_budget_remaining(self) -> int:
         """Get remaining token budget for this session."""
         return self.token_budget.remaining()
-    
+
+    def list_repo_files(self) -> List[str]:
+        """
+        List all source files in the repository.
+
+        Returns:
+            List of relative file paths as strings
+        """
+        try:
+            # Try to get from analysis if available
+            if hasattr(self, '_analysis_result') and self._analysis_result:
+                return [str(f.path) for f in self._analysis_result.files]
+
+            # Fallback to file system scan
+            files = []
+            for ext in ['*.py', '*.js', '*.ts', '*.java', '*.go']:
+                files.extend(self.repo_path.rglob(ext))
+
+            return sorted([str(f.relative_to(self.repo_path)) for f in files])
+        except Exception:
+            # Last resort: just Python files
+            return sorted([
+                str(f.relative_to(self.repo_path))
+                for f in self.repo_path.rglob('*.py')
+            ])
+
+    def get_repository_manifest(self) -> Optional[Any]:
+        """
+        Get repository analysis manifest if available.
+
+        Returns:
+            Analysis result or None
+        """
+        if hasattr(self, '_analysis_result'):
+            return self._analysis_result
+        return None
+
+    def file_exists(self, file_path: str) -> bool:
+        """
+        Check if a file exists in the repository.
+
+        Args:
+            file_path: Relative or absolute file path
+
+        Returns:
+            True if file exists, False otherwise
+        """
+        try:
+            path = Path(file_path)
+            if not path.is_absolute():
+                path = self.repo_path / path
+            return path.exists() and path.is_file()
+        except Exception:
+            return False
+
     def optimize_for_task(self, task: AgentTask) -> 'CodebaseAgent':
         """
         Optimize agent interface for specific task type.

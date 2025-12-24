@@ -46,18 +46,20 @@ class RepositoryAnalyzer:
         language_filter: list[Language] | None = None,
         parser_factory: ParserFactory | None = None,
         file_repository: FileRepository | None = None,
+        require_git: bool = False,
     ) -> None:
         self.workers = workers or cpu_count()
         self.include_tests = include_tests
         self.language_filter = set(language_filter) if language_filter else None
-        
+        self.require_git = require_git
+
         # Dependency injection
         self.parser_factory = parser_factory or DefaultParserFactory()
         self.file_repository = file_repository or FileSystemRepository()
-        
+
         # Initialize services with injected dependencies
         self.file_service = FileDiscoveryService(
-            include_tests, 
+            include_tests,
             self.language_filter,
             self.file_repository
         )
@@ -73,10 +75,10 @@ class RepositoryAnalyzer:
         if not repo_path.exists():
             raise InvalidRepositoryError(f"Repository path does not exist: {repo_path}")
 
-        if not (repo_path / ".git").exists():
+        if self.require_git and not (repo_path / ".git").exists():
             raise InvalidRepositoryError(f"Path is not a Git repository: {repo_path}")
 
-        logger.info(f"Analyzing repository: {repo_path}")
+        logger.info(f"Analyzing {'repository' if (repo_path / '.git').exists() else 'directory'}: {repo_path}")
 
         # Use services for focused operations
         source_files = self.file_service.find_source_files(repo_path)

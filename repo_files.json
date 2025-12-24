@@ -1,0 +1,74 @@
+[
+  {
+    "path": "demo.py",
+    "size": 4307
+  },
+  {
+    "path": "demo_agents_sdk.py",
+    "size": 749
+  },
+  {
+    "path": "main.py",
+    "size": 848
+  },
+  {
+    "path": "run_simple_agent.py",
+    "size": 609
+  },
+  {
+    "path": "test_deepseek.py",
+    "size": 668
+  },
+  {
+    "path": "src\\agent_system.py",
+    "size": 2526
+  },
+  {
+    "path": "src\\code_analyzer.py",
+    "size": 2924
+  },
+  {
+    "path": "src\\simple_agent.py",
+    "size": 3641
+  },
+  {
+    "path": "src\\analyzer\\requirement_analysis.py",
+    "size": 0
+  },
+  {
+    "path": "src\\solution\\solution_implementation.py",
+    "size": 1871
+  },
+  {
+    "path": "tests\\test_agent_system.py",
+    "size": 1444
+  },
+  {
+    "path": "tests\\test_code_analyzer.py",
+    "size": 1958
+  },
+  {
+    "path": "tests\\test_requirement_analysis.py",
+    "size": 0
+  },
+  {
+    "path": "tests\\test_solution_implementation.py",
+    "size": 4015
+  },
+  {
+    "path": "tests\\analyzer\\test_requirement_analysis.py",
+    "size": 0
+  },
+  {
+    "path": "tests\\solution\\test_solution_implementation.py",
+    "size": 2935
+  },
+  {
+    "path": "tests\\tests\\test_test_requirement_analysis.py",
+    "size": 0
+  },
+  {
+    "path": "tests\\tests\\test_test_solution_implementation.py",
+    "size": 151
+  }
+]

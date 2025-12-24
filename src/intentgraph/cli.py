@@ -21,6 +21,7 @@ from .application.clustering import ClusteringEngine
 from .domain.exceptions import CyclicDependencyError, IntentGraphError
 from .domain.models import Language, AnalysisResult, FileInfo
 from .domain.clustering import ClusterConfig, ClusterMode, IndexLevel
+from .agent.workflow import CodingAgentWorkflow, WorkflowStatus
 
 app = typer.Typer(
     name="intentgraph",
@@ -131,7 +132,7 @@ def filter_result_by_level(result: AnalysisResult, level: str) -> dict:
 def analyze(
     repository_path: Path = typer.Argument(
         ...,
-        help="Path to the Git repository to analyze",
+        help="Path to the directory or Git repository to analyze",
         exists=True,
         file_okay=False,
         dir_okay=True,
@@ -199,13 +200,18 @@ def analyze(
         help="Index detail level: basic (simple mapping), rich (full metadata)",
         click_type=click.Choice(["basic", "rich"]),
     ),
+    require_git: bool = typer.Option(
+        False,
+        "--require-git",
+        help="Require the path to be a Git repository (default: False, allows any directory)",
+    ),
     debug: bool = typer.Option(
         False,
         "--debug",
         help="Enable debug logging",
     ),
 ) -> None:
-    """Analyze a Git repository and generate dependency graph."""
+    """Analyze a Git repository or local directory and generate dependency graph."""
 
     # Setup logging
     import logging
@@ -240,6 +246,7 @@ def analyze(
             workers=workers or None,
             include_tests=include_tests,
             language_filter=lang_filter,
+            require_git=require_git,
         )
 
         # Run analysis with progress bar
@@ -403,6 +410,211 @@ def analyze(
     except Exception as e:
         logger.exception("Unexpected error during analysis")
         console.print(f"[red]Unexpected error:[/red] {e}")
+        sys.exit(1)
+
+
+# ===== Agent Commands =====
+
+@app.command()
+def agent_new_feature(
+    requirement: str = typer.Argument(..., help="Feature requirement description"),
+    repo: Path = typer.Option(Path.cwd(), "--repo", "-r", help="Repository path"),
+    api_key: str = typer.Option(None, "--api-key", envvar="OPENAI_API_KEY", help="LLM API key"),
+    provider: str = typer.Option("openai", "--provider", "-p", help="LLM provider (openai, deepseek, anthropic)"),
+    model: str = typer.Option(None, "--model", "-m", help="LLM model to use"),
+    token_budget: int = typer.Option(30000, "--token-budget", help="Maximum tokens to use"),
+    output: Path = typer.Option(None, "--output", "-o", help="Output directory for generated files"),
+):
+    """Implement a new feature using AI agent."""
+    console.print(f"[bold blue]🤖 AI Coding Agent - New Feature[/bold blue]")
+    console.print(f"Requirement: {requirement}\n")
+
+    try:
+        # Initialize LLM provider if API key provided
+        llm_provider = None
+        if api_key:
+            if provider == "deepseek":
+                from .agent.llm_provider import DeepSeekProvider
+                import os
+                base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+                default_model = "deepseek-coder"
+                llm_provider = DeepSeekProvider(
+                    api_key=api_key,
+                    base_url=base_url,
+                    model=model or default_model
+                )
+                console.print(f"[green]✓[/green] Using DeepSeek {model or default_model}")
+            elif provider == "anthropic":
+                from .agent.llm_provider import AnthropicProvider
+                default_model = "claude-3-sonnet-20240229"
+                llm_provider = AnthropicProvider(
+                    api_key=api_key,
+                    model=model or default_model
+                )
+                console.print(f"[green]✓[/green] Using Anthropic {model or default_model}")
+            else:  # openai
+                from .agent.llm_provider import OpenAIProvider
+                default_model = "gpt-4"
+                llm_provider = OpenAIProvider(
+                    api_key=api_key,
+                    model=model or default_model
+                )
+                console.print(f"[green]✓[/green] Using OpenAI {model or default_model}")
+        else:
+            console.print("[yellow]⚠[/yellow] No API key provided, using heuristic methods")
+
+        # Initialize workflow
+        workflow = CodingAgentWorkflow(repo, llm_provider, token_budget, output_dir=output)
+
+        # Execute workflow
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Implementing feature...", total=None)
+            result = workflow.implement_feature(requirement)
+
+        # Display results
+        if result.status == WorkflowStatus.COMPLETED:
+            console.print(f"\n[bold green]✓ Feature implementation completed![/bold green]")
+            console.print(f"Execution time: {result.execution_time:.2f}s")
+            console.print(f"Token usage: {result.token_usage:,}")
+
+            if result.files_created:
+                console.print(f"\n[bold]Files created:[/bold]")
+                for file in result.files_created:
+                    console.print(f"  • {file}")
+
+            if result.tests_generated:
+                console.print(f"\n[bold]Tests generated:[/bold]")
+                for test in result.tests_generated:
+                    console.print(f"  • {test}")
+
+            if result.warnings:
+                console.print(f"\n[yellow]Warnings:[/yellow]")
+                for warning in result.warnings:
+                    console.print(f"  ⚠ {warning}")
+        else:
+            console.print(f"\n[bold red]✗ Feature implementation failed[/bold red]")
+            for error in result.errors:
+                console.print(f"  [red]Error:[/red] {error}")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+
+@app.command()
+def agent_modify(
+    target: str = typer.Argument(..., help="Target symbol to modify (e.g., 'ClassName.method_name')"),
+    modification: str = typer.Argument(..., help="Modification description"),
+    repo: Path = typer.Option(Path.cwd(), "--repo", "-r", help="Repository path"),
+    api_key: str = typer.Option(None, "--api-key", envvar="OPENAI_API_KEY", help="LLM API key"),
+    provider: str = typer.Option("openai", "--provider", "-p", help="LLM provider (openai, deepseek, anthropic)"),
+    model: str = typer.Option(None, "--model", "-m", help="LLM model to use"),
+):
+    """Modify existing code using AI agent."""
+    console.print(f"[bold blue]🤖 AI Coding Agent - Code Modification[/bold blue]")
+    console.print(f"Target: {target}")
+    console.print(f"Modification: {modification}\n")
+
+    try:
+        # Initialize LLM provider if API key provided
+        llm_provider = None
+        if api_key:
+            if provider == "deepseek":
+                from .agent.llm_provider import DeepSeekProvider
+                import os
+                base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+                default_model = "deepseek-coder"
+                llm_provider = DeepSeekProvider(
+                    api_key=api_key,
+                    base_url=base_url,
+                    model=model or default_model
+                )
+            elif provider == "anthropic":
+                from .agent.llm_provider import AnthropicProvider
+                default_model = "claude-3-sonnet-20240229"
+                llm_provider = AnthropicProvider(
+                    api_key=api_key,
+                    model=model or default_model
+                )
+            else:  # openai
+                from .agent.llm_provider import OpenAIProvider
+                default_model = "gpt-4"
+                llm_provider = OpenAIProvider(
+                    api_key=api_key,
+                    model=model or default_model
+                )
+
+        # Initialize workflow
+        workflow = CodingAgentWorkflow(repo, llm_provider)
+
+        # Execute workflow
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Modifying code...", total=None)
+            result = workflow.modify_code(target, modification)
+
+        # Display results
+        if result.status == WorkflowStatus.COMPLETED:
+            console.print(f"\n[bold green]✓ Code modification completed![/bold green]")
+            console.print(f"Execution time: {result.execution_time:.2f}s")
+            console.print(f"Token usage: {result.token_usage:,}")
+
+            if result.files_modified:
+                console.print(f"\n[bold]Files modified:[/bold]")
+                for file in result.files_modified:
+                    console.print(f"  • {file}")
+
+            if result.warnings:
+                console.print(f"\n[yellow]Warnings:[/yellow]")
+                for warning in result.warnings:
+                    console.print(f"  ⚠ {warning}")
+        else:
+            console.print(f"\n[bold red]✗ Code modification failed[/bold red]")
+            for error in result.errors:
+                console.print(f"  [red]Error:[/red] {error}")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+
+@app.command()
+def agent_estimate(
+    requirement: str = typer.Argument(..., help="Requirement description"),
+    repo: Path = typer.Option(Path.cwd(), "--repo", "-r", help="Repository path"),
+):
+    """Estimate token usage for a requirement."""
+    console.print(f"[bold blue]🤖 AI Coding Agent - Token Estimation[/bold blue]\n")
+
+    try:
+        workflow = CodingAgentWorkflow(repo)
+        estimate = workflow.get_token_usage_estimate(requirement)
+
+        # Display estimate
+        table = Table(title="Token Usage Estimate")
+        table.add_column("Phase", style="cyan")
+        table.add_column("Tokens", justify="right", style="green")
+
+        for phase, tokens in estimate.items():
+            if phase != "total":
+                table.add_row(phase.capitalize(), f"{tokens:,}")
+
+        table.add_row("[bold]Total[/bold]", f"[bold]{estimate['total']:,}[/bold]")
+
+        console.print(table)
+        console.print(f"\n[dim]Estimated cost (GPT-4): ${estimate['total'] * 0.00003:.4f}[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
 
