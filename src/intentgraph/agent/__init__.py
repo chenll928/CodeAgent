@@ -22,11 +22,16 @@ from .requirement_analyzer import (
 )
 
 from .code_generator import (
-    CodeGenerator,
     CodeImplementation,
     CodeModification,
     TestSuite,
 )
+
+# Import enhanced version (this is what's actually used)
+from .enhanced_code_generator import EnhancedCodeGenerator
+
+# For backward compatibility, also expose as CodeGenerator
+CodeGenerator = EnhancedCodeGenerator
 
 from .workflow import (
     CodingAgentWorkflow,
@@ -52,6 +57,7 @@ __all__ = [
     "Task",
     # Code Generator
     "CodeGenerator",
+    "EnhancedCodeGenerator",
     "CodeImplementation",
     "CodeModification",
     "TestSuite",

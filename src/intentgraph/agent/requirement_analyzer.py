@@ -58,7 +58,7 @@ class Task:
     """Individual implementation task."""
     task_id: str
     description: str
-    task_type: str  # 'create_file', 'modify_file', 'add_function', 'modify_function', 'add_test'
+    task_type: str  # 'create_file', 'modify_file', 'add_function', 'modify_function' (NO 'add_test' - tests handled separately)
     target_file: Optional[str] = None
     target_symbol: Optional[str] = None
     dependencies: List[str] = field(default_factory=list)  # Other task IDs
@@ -293,6 +293,9 @@ class RequirementAnalyzer:
         file_inventory = '\n'.join(sorted({Path(p).name for p in self._repo_files})[:50])
         prompt = f"""Analyze the following software requirement and extract key information.
 
+IMPORTANT: Keep the analysis simple and direct. If the requirement is straightforward (like "add a sum function"),
+don't over-complicate it. Focus on what the user actually asked for.
+
 Requirement:
 {requirement}
 
@@ -306,11 +309,11 @@ Repository Snapshot (file names only):
 
 Please analyze and provide:
 1. Requirement Type: (new_feature, modify_existing, bug_fix, refactor, test_generation)
-2. Affected Scope: Which files/modules will be affected
-3. Key Entities: Classes, functions, or concepts involved
+2. Affected Scope: Which files/modules will be affected (be specific and realistic)
+3. Key Entities: Classes, functions, or concepts involved (match the requirement's scope)
 4. Technical Constraints: Any technical limitations or requirements
 5. Success Criteria: How to verify the requirement is met
-6. Estimated Complexity: (low, medium, high)
+6. Estimated Complexity: (low, medium, high) - simple functions should be "low"
 
 Respond in JSON format:
 {{
@@ -333,7 +336,13 @@ Respond in JSON format:
         """Build prompt for solution design."""
         prompt = f"""Design a technical solution for the following requirement.
 
+IMPORTANT: Keep the design simple and proportional to the requirement complexity.
+- For low complexity: Simple, direct implementation (e.g., a single function or class)
+- For medium complexity: Moderate design with a few components
+- For high complexity: Comprehensive architecture
+
 Requirement Analysis:
+- Original Requirement: {analysis.requirement_text}
 - Type: {analysis.requirement_type}
 - Scope: {', '.join(analysis.affected_scope)}
 - Key Entities: {', '.join(analysis.key_entities)}
@@ -353,12 +362,12 @@ Repository Guardrails:
 - Do not invent arbitrary directories.
 
 Please provide a technical design including:
-1. Technical Approach: High-level approach and architecture
-2. New Components: Components to create (name, type, purpose)
-3. Modified Components: Existing components to modify
+1. Technical Approach: High-level approach (keep it simple for simple requirements)
+2. New Components: Components to create (name, type, purpose) - only what's necessary
+3. Modified Components: Existing components to modify (if any)
 4. Integration Points: Where new code integrates with existing code
 5. Interface Definitions: Key interfaces and signatures
-6. Implementation Steps: Ordered steps for implementation
+6. Implementation Steps: Ordered steps for implementation (2-5 steps for simple requirements)
 7. Potential Risks: Risks and mitigation strategies
 
 Respond in JSON format with these fields.
@@ -388,12 +397,14 @@ Implementation Steps:
 IMPORTANT: For each task, you MUST specify a concrete target_file path.
 - For new components, use pattern: src/<module_name>/<component_name>.py and ensure <module_name> exists in {sorted(self._module_roots)}
 - For modifications, specify the exact file path to modify and ensure it matches one of {sorted(self._repo_files)[:30]}
-- For tests, use pattern: tests/test_<component_name>.py
+
+CRITICAL: DO NOT generate any test-related tasks (add_test). Test generation will be handled separately.
+Focus ONLY on implementation tasks: create_file, modify_file, add_function, modify_function.
 
 Please decompose into tasks with:
 1. Task ID: Unique identifier (e.g., "task_1", "task_2")
 2. Description: What to do
-3. Task Type: (create_file, modify_file, add_function, modify_function, add_test)
+3. Task Type: ONLY use (create_file, modify_file, add_function, modify_function) - NO test tasks
 4. Target File: REQUIRED - Concrete file path (e.g., "src/analyzer/requirement_parser.py")
 5. Target Symbol: Function/class to work on (if applicable)
 6. Dependencies: Other task IDs this depends on
@@ -490,10 +501,30 @@ Example format:
 
                 validated_file = self._validate_or_adjust_target_file(target_file)
 
+                # Get task type from LLM response
+                task_type = task_data.get("task_type", "modify_file")
+
+                # Smart task type adjustment based on file existence
+                # If LLM says modify_file but file doesn't exist, change to create_file
+                if task_type == "modify_file":
+                    normalized_file = validated_file.replace('\\', '/').lstrip('/')
+                    if normalized_file not in self._repo_files:
+                        # File doesn't exist, should be create_file
+                        task_type = "create_file"
+                        print(f"[INFO] Adjusted task type from 'modify_file' to 'create_file' for {validated_file} (file doesn't exist)")
+
+                # If LLM says create_file but file exists, change to modify_file
+                elif task_type == "create_file":
+                    normalized_file = validated_file.replace('\\', '/').lstrip('/')
+                    if normalized_file in self._repo_files:
+                        # File exists, should be modify_file
+                        task_type = "modify_file"
+                        print(f"[INFO] Adjusted task type from 'create_file' to 'modify_file' for {validated_file} (file exists)")
+
                 tasks.append(Task(
                     task_id=task_data.get("task_id", f"task_{i}"),
                     description=task_data.get("description", ""),
-                    task_type=task_data.get("task_type", "modify_file"),
+                    task_type=task_type,
                     target_file=validated_file,
                     target_symbol=task_data.get("target_symbol"),
                     dependencies=task_data.get("dependencies", []),

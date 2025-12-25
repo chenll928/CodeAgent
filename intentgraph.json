@@ -1,0 +1,844 @@
+{
+  "analyzed_at": "2025-12-24 06:11:16.122998",
+  "root": "E:\\cll\\ai\\modelLearn\\CodeAgent",
+  "language_summary": {
+    "Language.PYTHON": {
+      "file_count": 49,
+      "total_bytes": 462092
+    }
+  },
+  "files": [
+    {
+      "path": "ai_interface_demo.py",
+      "language": "python",
+      "dependencies": [
+        "84755843-98f6-4993-8308-068a64aa26a3",
+        "358fb89a-14d3-4362-acf8-d850ca0d333a",
+        "582b7f4d-43aa-470c-b854-0ee58ff11bfb",
+        "3a35fc2a-30bd-4091-9e6c-c0db10d0f14e",
+        "958f2fed-4dd5-47d1-ad7b-6b0917bb29b8"
+      ],
+      "imports": [
+        "from src.intentgraph.ai import get_capabilities_manifest",
+        "from src.intentgraph.ai.query import QueryBuilder",
+        "from src.intentgraph.ai.agent import AgentContext",
+        "from src.intentgraph.ai.response import TokenBudget, ResponseOptimizer",
+        "from src.intentgraph.ai.navigation import AutonomousNavigator, NavigationContext",
+        "import traceback"
+      ],
+      "loc": 122,
+      "complexity_score": 9
+    },
+    {
+      "path": "setup.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from setuptools import setup"
+      ],
+      "loc": 4,
+      "complexity_score": 2
+    },
+    {
+      "path": "examples\\deepseek_demo.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import os",
+        "from pathlib import Path",
+        "from dotenv import load_dotenv",
+        "from intentgraph.agent import CodingAgentWorkflow, RequirementAnalyzer, CodeGenerator, ContextManager",
+        "from intentgraph.agent.llm_provider import DeepSeekProvider",
+        "from intentgraph.ai.enhanced_agent import EnhancedCodebaseAgent",
+        "from intentgraph.agent import Task, DesignPlan, RequirementAnalysis, RequirementType",
+        "import traceback"
+      ],
+      "loc": 212,
+      "complexity_score": 13
+    },
+    {
+      "path": "examples\\phase3_phase4_demo.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from pathlib import Path",
+        "from intentgraph.ai.enhanced_agent import EnhancedCodebaseAgent",
+        "from intentgraph.agent import ContextManager, RequirementAnalyzer, CodeGenerator",
+        "from intentgraph.agent import CodeChange",
+        "import traceback"
+      ],
+      "loc": 155,
+      "complexity_score": 12
+    },
+    {
+      "path": "examples\\phase5_demo.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from pathlib import Path",
+        "from intentgraph.agent import CodingAgentWorkflow, WorkflowStatus, CacheManager, configure_logger, get_logger",
+        "import time",
+        "import time",
+        "import traceback"
+      ],
+      "loc": 179,
+      "complexity_score": 14
+    },
+    {
+      "path": "examples\\use_in_other_project.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import os",
+        "import sys",
+        "from pathlib import Path",
+        "from dotenv import load_dotenv",
+        "from intentgraph.ai.enhanced_agent import EnhancedCodebaseAgent",
+        "from intentgraph.agent import RequirementAnalyzer",
+        "from intentgraph.agent.llm_provider import DeepSeekProvider",
+        "from intentgraph.agent import CodeGenerator, ContextManager",
+        "from intentgraph.agent.llm_provider import DeepSeekProvider",
+        "from intentgraph.agent import CodingAgentWorkflow",
+        "from intentgraph.agent.llm_provider import DeepSeekProvider",
+        "import traceback"
+      ],
+      "loc": 218,
+      "complexity_score": 20
+    },
+    {
+      "path": "examples\\ai_agent_integration\\output_levels_demo.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "import subprocess",
+        "from pathlib import Path"
+      ],
+      "loc": 162,
+      "complexity_score": 21
+    },
+    {
+      "path": "examples\\ai_native\\autonomous_agent_demo.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "from pathlib import Path",
+        "import sys",
+        "from intentgraph import connect_to_codebase, get_capabilities_manifest, analyze_for_ai, quick_explore"
+      ],
+      "loc": 226,
+      "complexity_score": 28
+    },
+    {
+      "path": "examples\\basic_usage\\analyze_repository.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "import subprocess",
+        "from pathlib import Path",
+        "from intentgraph import RepositoryAnalyzer",
+        "from intentgraph.domain.models import Language",
+        "from intentgraph.application.streaming_analyzer import StreamingAnalyzer",
+        "from intentgraph.application.streaming_analyzer import IncrementalAnalyzer"
+      ],
+      "loc": 99,
+      "complexity_score": 11
+    },
+    {
+      "path": "examples\\clustering\\cluster_mode_comparison.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "import subprocess",
+        "import sys",
+        "from pathlib import Path",
+        "from typing import Dict, List, Any",
+        "import shutil"
+      ],
+      "loc": 203,
+      "complexity_score": 25
+    },
+    {
+      "path": "examples\\clustering\\large_codebase_navigation.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "import subprocess",
+        "import sys",
+        "from pathlib import Path",
+        "from typing import Dict, List, Any"
+      ],
+      "loc": 145,
+      "complexity_score": 21
+    },
+    {
+      "path": "src\\intentgraph\\cli.py",
+      "language": "python",
+      "dependencies": [
+        "f7b16584-8858-4963-a04c-c5480586cf32",
+        "cf83212e-244a-4dcd-b302-e83a087d85c8",
+        "b5d42a96-a0da-44fb-adc4-d722e262ad1d",
+        "6d3120e8-e68d-4fc4-955e-7088b4488241",
+        "34d2e4ef-532a-479c-a7f3-f8a1d95a824b",
+        "89c420a5-5c8e-4fb1-be17-332c26b619d9",
+        "6be864f4-1afd-4e9c-90fd-a795d1b5784b",
+        "6be864f4-1afd-4e9c-90fd-a795d1b5784b",
+        "6be864f4-1afd-4e9c-90fd-a795d1b5784b",
+        "6be864f4-1afd-4e9c-90fd-a795d1b5784b",
+        "6be864f4-1afd-4e9c-90fd-a795d1b5784b",
+        "6be864f4-1afd-4e9c-90fd-a795d1b5784b"
+      ],
+      "imports": [
+        "import json",
+        "import re",
+        "import sys",
+        "import unicodedata",
+        "from pathlib import Path",
+        "import click",
+        "import typer",
+        "from rich.console import Console",
+        "from rich.logging import RichHandler",
+        "from rich.progress import Progress, SpinnerColumn, TextColumn",
+        "from rich.table import Table",
+        "from .application.analyzer import RepositoryAnalyzer",
+        "from .application.clustering import ClusteringEngine",
+        "from .domain.exceptions import CyclicDependencyError, IntentGraphError",
+        "from .domain.models import Language, AnalysisResult, FileInfo",
+        "from .domain.clustering import ClusterConfig, ClusterMode, IndexLevel",
+        "from .agent.workflow import CodingAgentWorkflow, WorkflowStatus",
+        "import logging",
+        "from .agent.llm_provider import DeepSeekProvider",
+        "import os",
+        "from .agent.llm_provider import AnthropicProvider",
+        "from .agent.llm_provider import OpenAIProvider",
+        "from .agent.llm_provider import DeepSeekProvider",
+        "import os",
+        "from .agent.llm_provider import AnthropicProvider",
+        "from .agent.llm_provider import OpenAIProvider"
+      ],
+      "loc": 502,
+      "complexity_score": 73
+    },
+    {
+      "path": "src\\intentgraph\\__init__.py",
+      "language": "python",
+      "dependencies": [
+        "6d3120e8-e68d-4fc4-955e-7088b4488241",
+        "84755843-98f6-4993-8308-068a64aa26a3",
+        "f7b16584-8858-4963-a04c-c5480586cf32"
+      ],
+      "imports": [
+        "from .domain.models import AnalysisResult, FileInfo, Language, LanguageSummary",
+        "from .ai import connect_to_codebase, CodebaseAgent, get_capabilities_manifest",
+        "from .application.analyzer import RepositoryAnalyzer"
+      ],
+      "loc": 45,
+      "complexity_score": 2
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\file_repository.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import hashlib",
+        "import os",
+        "from abc import ABC, abstractmethod",
+        "from pathlib import Path",
+        "from typing import Dict, Optional"
+      ],
+      "loc": 178,
+      "complexity_score": 17
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\git.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import logging",
+        "from pathlib import Path",
+        "import pathspec",
+        "from git import Repo"
+      ],
+      "loc": 93,
+      "complexity_score": 17
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\output.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "import logging",
+        "from pathlib import Path",
+        "from types import MappingProxyType",
+        "from typing import Any",
+        "from uuid import UUID",
+        "import orjson",
+        "from ..domain.models import AnalysisResult",
+        "import jsonschema"
+      ],
+      "loc": 94,
+      "complexity_score": 21
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\__init__.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [],
+      "loc": 1,
+      "complexity_score": 1
+    },
+    {
+      "path": "src\\intentgraph\\agent\\cache.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import hashlib",
+        "import json",
+        "import pickle",
+        "from pathlib import Path",
+        "from typing import Any, Optional, Dict",
+        "from datetime import datetime, timedelta",
+        "from dataclasses import dataclass, asdict"
+      ],
+      "loc": 165,
+      "complexity_score": 22
+    },
+    {
+      "path": "src\\intentgraph\\agent\\code_generator.py",
+      "language": "python",
+      "dependencies": [
+        "b1ef614d-cd63-4542-add4-6d23f0a93d65",
+        "d5063df0-b81c-4677-a5ea-82573bc4c677"
+      ],
+      "imports": [
+        "from pathlib import Path",
+        "from typing import Dict, List, Any, Optional",
+        "from dataclasses import dataclass, field",
+        "import json",
+        "from textwrap import dedent",
+        "from .requirement_analyzer import DesignPlan, Task",
+        "from .context_manager import ContextManager, PreciseContext",
+        "from ..ai.enhanced_agent import EnhancedCodebaseAgent",
+        "import traceback",
+        "import re",
+        "import re",
+        "import re",
+        "import re"
+      ],
+      "loc": 593,
+      "complexity_score": 71
+    },
+    {
+      "path": "src\\intentgraph\\agent\\context_manager.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from pathlib import Path",
+        "from typing import Dict, List, Any, Optional, Set, Tuple",
+        "from dataclasses import dataclass, field",
+        "from collections import defaultdict",
+        "from enum import Enum",
+        "import re",
+        "from ..ai.enhanced_agent import EnhancedCodebaseAgent, CallChain, CallChainNode, CodeLocation",
+        "from ..domain.models import CodeSymbol"
+      ],
+      "loc": 537,
+      "complexity_score": 69
+    },
+    {
+      "path": "src\\intentgraph\\agent\\llm_provider.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from abc import ABC, abstractmethod",
+        "from typing import Dict, List, Any, Optional",
+        "from dataclasses import dataclass",
+        "import openai",
+        "import anthropic",
+        "import openai"
+      ],
+      "loc": 224,
+      "complexity_score": 13
+    },
+    {
+      "path": "src\\intentgraph\\agent\\logger.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import logging",
+        "import time",
+        "from pathlib import Path",
+        "from typing import Dict, Any, Optional, List",
+        "from dataclasses import dataclass, field",
+        "from datetime import datetime",
+        "from enum import Enum",
+        "import json"
+      ],
+      "loc": 158,
+      "complexity_score": 7
+    },
+    {
+      "path": "src\\intentgraph\\agent\\requirement_analyzer.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from pathlib import Path",
+        "from typing import Dict, List, Any, Optional, Set",
+        "from dataclasses import dataclass, field",
+        "from enum import Enum",
+        "import json",
+        "import re",
+        "from ..ai.enhanced_agent import EnhancedCodebaseAgent, ArchitectureMap",
+        "import re",
+        "import re"
+      ],
+      "loc": 587,
+      "complexity_score": 73
+    },
+    {
+      "path": "src\\intentgraph\\agent\\workflow.py",
+      "language": "python",
+      "dependencies": [
+        "d5063df0-b81c-4677-a5ea-82573bc4c677",
+        "b1ef614d-cd63-4542-add4-6d23f0a93d65",
+        "8c6a7a71-e490-4686-8d9b-85375b113d9d",
+        "24d049b0-b5d0-47e9-9d19-54c26bf7850c",
+        "eedb3acc-3198-44ab-9906-00d5b256b387",
+        "8c6a7a71-e490-4686-8d9b-85375b113d9d",
+        "8c6a7a71-e490-4686-8d9b-85375b113d9d"
+      ],
+      "imports": [
+        "from pathlib import Path",
+        "from typing import Dict, List, Any, Optional",
+        "from dataclasses import dataclass, field",
+        "from enum import Enum",
+        "from ..ai.enhanced_agent import EnhancedCodebaseAgent",
+        "from .context_manager import ContextManager, CodeChange",
+        "from .requirement_analyzer import RequirementAnalyzer, RequirementType",
+        "from .code_generator import CodeGenerator",
+        "from .cache import CacheManager",
+        "from .logger import AgentLogger, get_logger",
+        "import time",
+        "import time",
+        "from .code_generator import CodeImplementation",
+        "from .code_generator import TestSuite"
+      ],
+      "loc": 184,
+      "complexity_score": 16
+    },
+    {
+      "path": "src\\intentgraph\\agent\\__init__.py",
+      "language": "python",
+      "dependencies": [
+        "d5063df0-b81c-4677-a5ea-82573bc4c677",
+        "b1ef614d-cd63-4542-add4-6d23f0a93d65",
+        "8c6a7a71-e490-4686-8d9b-85375b113d9d",
+        "89c420a5-5c8e-4fb1-be17-332c26b619d9",
+        "24d049b0-b5d0-47e9-9d19-54c26bf7850c",
+        "eedb3acc-3198-44ab-9906-00d5b256b387"
+      ],
+      "imports": [
+        "from .context_manager import ContextManager, PreciseContext, ImpactAnalysis, CodeChange, ContextLayer",
+        "from .requirement_analyzer import RequirementAnalyzer, RequirementAnalysis, RequirementType, DesignPlan, Task",
+        "from .code_generator import CodeGenerator, CodeImplementation, CodeModification, TestSuite",
+        "from .workflow import CodingAgentWorkflow, WorkflowResult, WorkflowStatus",
+        "from .cache import CacheManager",
+        "from .logger import AgentLogger, get_logger, configure_logger"
+      ],
+      "loc": 55,
+      "complexity_score": 1
+    },
+    {
+      "path": "src\\intentgraph\\ai\\agent.py",
+      "language": "python",
+      "dependencies": [
+        "327eb259-d0f5-4e17-bf89-a75086b8b70e",
+        "358fb89a-14d3-4362-acf8-d850ca0d333a",
+        "3a35fc2a-30bd-4091-9e6c-c0db10d0f14e",
+        "958f2fed-4dd5-47d1-ad7b-6b0917bb29b8"
+      ],
+      "imports": [
+        "import json",
+        "from pathlib import Path",
+        "from typing import Dict, List, Any, Optional, Union",
+        "from dataclasses import dataclass",
+        "from enum import Enum",
+        "from ..application.analyzer import RepositoryAnalyzer",
+        "from ..application.clustering import ClusteringEngine",
+        "from ..domain.clustering import ClusterConfig, ClusterMode, IndexLevel",
+        "from .manifest import get_capabilities_manifest",
+        "from .query import QueryBuilder, SemanticQuery",
+        "from .response import ResponseOptimizer, TokenBudget",
+        "from .navigation import AutonomousNavigator"
+      ],
+      "loc": 251,
+      "complexity_score": 21
+    },
+    {
+      "path": "src\\intentgraph\\ai\\enhanced_agent.py",
+      "language": "python",
+      "dependencies": [
+        "582b7f4d-43aa-470c-b854-0ee58ff11bfb"
+      ],
+      "imports": [
+        "from pathlib import Path",
+        "from typing import Dict, List, Any, Optional, Set, Tuple",
+        "from dataclasses import dataclass, field",
+        "from collections import defaultdict, deque",
+        "from uuid import UUID",
+        "from .agent import CodebaseAgent, AgentContext",
+        "from ..application.analyzer import RepositoryAnalyzer",
+        "from ..domain.models import AnalysisResult, FileInfo, CodeSymbol, FunctionDependency"
+      ],
+      "loc": 606,
+      "complexity_score": 120
+    },
+    {
+      "path": "src\\intentgraph\\ai\\manifest.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from typing import Dict, Any, List",
+        "from datetime import datetime",
+        "import json",
+        "from ..domain.models import Language"
+      ],
+      "loc": 267,
+      "complexity_score": 12
+    },
+    {
+      "path": "src\\intentgraph\\ai\\navigation.py",
+      "language": "python",
+      "dependencies": [
+        "358fb89a-14d3-4362-acf8-d850ca0d333a"
+      ],
+      "imports": [
+        "from typing import Dict, Any, List, Optional, Union, Tuple",
+        "from pathlib import Path",
+        "import json",
+        "from dataclasses import dataclass",
+        "from ..application.analyzer import RepositoryAnalyzer",
+        "from ..application.clustering import ClusteringEngine",
+        "from ..domain.clustering import ClusterConfig, ClusterMode, IndexLevel",
+        "from ..domain.models import Language, AnalysisResult",
+        "from .query import SemanticQuery, QueryType"
+      ],
+      "loc": 454,
+      "complexity_score": 72
+    },
+    {
+      "path": "src\\intentgraph\\ai\\query.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from typing import Dict, Any, List, Optional, Union",
+        "from dataclasses import dataclass, field",
+        "from enum import Enum",
+        "import re",
+        "from pathlib import Path"
+      ],
+      "loc": 255,
+      "complexity_score": 18
+    },
+    {
+      "path": "src\\intentgraph\\ai\\response.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from typing import Dict, Any, List, Optional, Union",
+        "from dataclasses import dataclass",
+        "from enum import Enum",
+        "import json",
+        "import re"
+      ],
+      "loc": 373,
+      "complexity_score": 43
+    },
+    {
+      "path": "src\\intentgraph\\ai\\__init__.py",
+      "language": "python",
+      "dependencies": [
+        "582b7f4d-43aa-470c-b854-0ee58ff11bfb",
+        "056f64b2-fb03-44f8-9577-f80361bd551b",
+        "327eb259-d0f5-4e17-bf89-a75086b8b70e",
+        "358fb89a-14d3-4362-acf8-d850ca0d333a",
+        "3a35fc2a-30bd-4091-9e6c-c0db10d0f14e",
+        "958f2fed-4dd5-47d1-ad7b-6b0917bb29b8"
+      ],
+      "imports": [
+        "from .agent import CodebaseAgent",
+        "from .enhanced_agent import EnhancedCodebaseAgent, CallChain, CallChainNode, EntryPoint, CodeLocation, ArchitectureMap, ModuleBoundaries",
+        "from .manifest import get_capabilities_manifest",
+        "from .query import SemanticQuery, QueryBuilder",
+        "from .response import ResponseOptimizer, TokenBudget",
+        "from .navigation import AutonomousNavigator"
+      ],
+      "loc": 58,
+      "complexity_score": 2
+    },
+    {
+      "path": "src\\intentgraph\\application\\analyzer.py",
+      "language": "python",
+      "dependencies": [
+        "e18cfa2c-e347-472a-a580-bd490da4b72e"
+      ],
+      "imports": [
+        "import logging",
+        "from abc import ABC, abstractmethod",
+        "from concurrent.futures import ProcessPoolExecutor, as_completed",
+        "from multiprocessing import cpu_count",
+        "from pathlib import Path",
+        "from ..adapters.file_repository import FileRepository, FileSystemRepository",
+        "from ..adapters.parsers.base import LanguageParser",
+        "from ..domain.exceptions import InvalidRepositoryError",
+        "from ..domain.models import AnalysisResult, Language",
+        "from .services import FileDiscoveryService, CodeAnalysisService, DependencyGraphService, LanguageSummaryService",
+        "from ..adapters.parsers import get_parser_for_language"
+      ],
+      "loc": 80,
+      "complexity_score": 8
+    },
+    {
+      "path": "src\\intentgraph\\application\\clustering.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import json",
+        "from collections import defaultdict",
+        "from pathlib import Path",
+        "from typing import Dict, List, Set, Tuple, Optional",
+        "from uuid import uuid4",
+        "from ..domain.clustering import ClusterConfig, ClusterMode, IndexLevel, ClusterFile, ClusterMetadata, ClusterSummary, CrossClusterDependency, ClusterIndex, ClusterResult",
+        "from ..domain.models import AnalysisResult, FileInfo"
+      ],
+      "loc": 373,
+      "complexity_score": 74
+    },
+    {
+      "path": "src\\intentgraph\\application\\services.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import logging",
+        "from pathlib import Path",
+        "from typing import Optional",
+        "from ..adapters.git import GitIgnoreHandler",
+        "from ..adapters.parsers import get_parser_for_language",
+        "from ..domain.exceptions import InvalidRepositoryError",
+        "from ..domain.graph import DependencyGraph",
+        "from ..domain.models import AnalysisResult, FileInfo, Language, LanguageSummary",
+        "from ..adapters.parsers.enhanced_python_parser import EnhancedPythonParser"
+      ],
+      "loc": 215,
+      "complexity_score": 60
+    },
+    {
+      "path": "src\\intentgraph\\application\\streaming_analyzer.py",
+      "language": "python",
+      "dependencies": [
+        "f7b16584-8858-4963-a04c-c5480586cf32"
+      ],
+      "imports": [
+        "import logging",
+        "from pathlib import Path",
+        "from typing import Iterator, List",
+        "from ..domain.models import FileInfo, AnalysisResult, Language",
+        "from .analyzer import RepositoryAnalyzer"
+      ],
+      "loc": 79,
+      "complexity_score": 11
+    },
+    {
+      "path": "src\\intentgraph\\application\\__init__.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [],
+      "loc": 1,
+      "complexity_score": 1
+    },
+    {
+      "path": "src\\intentgraph\\domain\\clustering.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from dataclasses import dataclass, field",
+        "from datetime import datetime",
+        "from enum import Enum",
+        "from pathlib import Path",
+        "from typing import Optional, Dict, List",
+        "from uuid import UUID, uuid4",
+        "from pydantic import BaseModel, Field"
+      ],
+      "loc": 94,
+      "complexity_score": 1
+    },
+    {
+      "path": "src\\intentgraph\\domain\\exceptions.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [],
+      "loc": 14,
+      "complexity_score": 1
+    },
+    {
+      "path": "src\\intentgraph\\domain\\graph.py",
+      "language": "python",
+      "dependencies": [
+        "6d3120e8-e68d-4fc4-955e-7088b4488241"
+      ],
+      "imports": [
+        "from uuid import UUID",
+        "import networkx",
+        "from .models import FileInfo"
+      ],
+      "loc": 50,
+      "complexity_score": 5
+    },
+    {
+      "path": "src\\intentgraph\\domain\\models.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "import hashlib",
+        "from dataclasses import dataclass, field",
+        "from datetime import datetime",
+        "from enum import Enum",
+        "from pathlib import Path",
+        "from typing import Optional, Any",
+        "from uuid import UUID, uuid4",
+        "from pydantic import BaseModel, Field, validator"
+      ],
+      "loc": 146,
+      "complexity_score": 4
+    },
+    {
+      "path": "src\\intentgraph\\domain\\__init__.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [],
+      "loc": 1,
+      "complexity_score": 1
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\base.py",
+      "language": "python",
+      "dependencies": [],
+      "imports": [
+        "from abc import ABC, abstractmethod",
+        "from pathlib import Path",
+        "from typing import Optional",
+        "from ...domain.models import CodeSymbol, APIExport, FunctionDependency"
+      ],
+      "loc": 93,
+      "complexity_score": 19
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\enhanced_python_parser.py",
+      "language": "python",
+      "dependencies": [
+        "5e935e8a-1965-4413-8fac-da35250702ba"
+      ],
+      "imports": [
+        "import ast",
+        "import logging",
+        "from pathlib import Path",
+        "from typing import Optional, Any",
+        "from uuid import uuid4",
+        "from .base import LanguageParser",
+        "from ...domain.models import CodeSymbol, APIExport, FunctionDependency"
+      ],
+      "loc": 483,
+      "complexity_score": 80
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\go_parser.py",
+      "language": "python",
+      "dependencies": [
+        "5e935e8a-1965-4413-8fac-da35250702ba"
+      ],
+      "imports": [
+        "import json",
+        "import logging",
+        "import os",
+        "import subprocess",
+        "from pathlib import Path",
+        "from .base import LanguageParser"
+      ],
+      "loc": 106,
+      "complexity_score": 24
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\javascript_parser.py",
+      "language": "python",
+      "dependencies": [
+        "5e935e8a-1965-4413-8fac-da35250702ba"
+      ],
+      "imports": [
+        "import logging",
+        "from pathlib import Path",
+        "from tree_sitter_language_pack import get_language, get_parser",
+        "from .base import LanguageParser"
+      ],
+      "loc": 70,
+      "complexity_score": 17
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\python_parser.py",
+      "language": "python",
+      "dependencies": [
+        "5e935e8a-1965-4413-8fac-da35250702ba"
+      ],
+      "imports": [
+        "import logging",
+        "from pathlib import Path",
+        "import grimp",
+        "from .base import LanguageParser",
+        "import ast"
+      ],
+      "loc": 77,
+      "complexity_score": 19
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\typescript_parser.py",
+      "language": "python",
+      "dependencies": [
+        "5e935e8a-1965-4413-8fac-da35250702ba"
+      ],
+      "imports": [
+        "import logging",
+        "from pathlib import Path",
+        "from tree_sitter_language_pack import get_language, get_parser",
+        "from .base import LanguageParser"
+      ],
+      "loc": 72,
+      "complexity_score": 17
+    },
+    {
+      "path": "src\\intentgraph\\adapters\\parsers\\__init__.py",
+      "language": "python",
+      "dependencies": [
+        "5e935e8a-1965-4413-8fac-da35250702ba",
+        "da82b470-8847-4517-9f1f-971ea8f21e17",
+        "08ec59c6-32c4-4416-a50d-862be95b5224",
+        "afc7e022-5580-46c7-993c-7edb6aff6e25",
+        "ce96437d-6a04-445c-932e-16e0a686177c"
+      ],
+      "imports": [
+        "from typing import Optional",
+        "from ...domain.models import Language",
+        "from .base import LanguageParser",
+        "from .go_parser import GoParser",
+        "from .javascript_parser import JavaScriptParser",
+        "from .python_parser import PythonParser",
+        "from .typescript_parser import TypeScriptParser"
+      ],
+      "loc": 30,
+      "complexity_score": 1
+    }
+  ]
+}

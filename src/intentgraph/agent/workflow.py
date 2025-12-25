@@ -16,7 +16,7 @@ from enum import Enum
 from ..ai.enhanced_agent import EnhancedCodebaseAgent
 from .context_manager import ContextManager, CodeChange
 from .requirement_analyzer import RequirementAnalyzer, RequirementType
-from .code_generator import CodeGenerator
+from .enhanced_code_generator import EnhancedCodeGenerator
 from .cache import CacheManager
 from .logger import AgentLogger, get_logger
 
@@ -79,7 +79,12 @@ class CodingAgentWorkflow:
         self.agent = EnhancedCodebaseAgent(repo_path)
         self.context_manager = ContextManager(self.agent)
         self.analyzer = RequirementAnalyzer(self.agent, llm_provider)
-        self.generator = CodeGenerator(self.agent, self.context_manager, llm_provider)
+        self.generator = EnhancedCodeGenerator(
+            self.agent,
+            self.context_manager,
+            workspace_root=repo_path,
+            llm_provider=llm_provider
+        )
 
     def implement_feature(self, requirement: str) -> WorkflowResult:
         """
@@ -133,18 +138,19 @@ class CodingAgentWorkflow:
 
                 result.token_usage += 4000
 
-                # Write implementation to file
-                written_path = self._write_implementation(impl)
-                result.files_created.append(written_path)
+                # File is already written by EnhancedCodeGenerator
+                result.files_created.append(impl.file_path)
+                self.logger.logger.info(f"File created: {impl.file_path}")
 
-                # Step 5: Generate tests
-                self.logger.logger.info(f"Step 5.{i}: Generating tests")
-                test_suite = self.generator.generate_tests(impl)
-                result.token_usage += 3000
-
-                # Write tests to file
-                test_path = self._write_tests(test_suite)
-                result.tests_generated.append(test_path)
+                # TODO: Test generation disabled - will be implemented separately
+                # Step 5: Generate tests (SKIPPED)
+                # self.logger.logger.info(f"Step 5.{i}: Generating tests")
+                # test_suite = self.generator.generate_tests(impl)
+                # result.token_usage += 3000
+                #
+                # # Write tests to file
+                # test_path = self._write_tests(test_suite)
+                # result.tests_generated.append(test_path)
 
             result.status = WorkflowStatus.COMPLETED
 

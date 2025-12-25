@@ -6,6 +6,10 @@
 
 ```bash
 # 方式 1: 从源码安装（推荐）
+cd E:\cll\ai\modelLearn\agentCoder
+uv venv
+uv pip install -e E:\cll\ai\modelLearn\CodeAgent
+
 cd /path/to/CodeAgent
 uv pip install -e .
 

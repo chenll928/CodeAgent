@@ -18,6 +18,10 @@ from textwrap import dedent
 from .requirement_analyzer import DesignPlan, Task
 from .context_manager import ContextManager, PreciseContext
 from ..ai.enhanced_agent import EnhancedCodebaseAgent
+from .code_validator import CodeValidator
+from .code_auto_fixer import CodeAutoFixer
+from .improved_retry_strategy import ImprovedRetryStrategy
+from .improved_prompts import ImprovedPromptTemplates
 
 
 @dataclass
@@ -87,14 +91,21 @@ class CodeGenerator:
         self.context_manager = context_manager
         self.llm_provider = llm_provider
 
+        # Initialize new components
+        self.validator = CodeValidator()
+        self.auto_fixer = CodeAutoFixer()
+        self.retry_strategy = ImprovedRetryStrategy(max_attempts=3, enable_auto_fix=True)
+        self.prompt_templates = ImprovedPromptTemplates()
+
     def implement_new_feature(
         self,
         design: DesignPlan,
         task: Task,
-        context: Optional[PreciseContext] = None
+        context: Optional[PreciseContext] = None,
+        max_retries: int = 3
     ) -> CodeImplementation:
         """
-        Implement a new feature based on design and task.
+        Implement a new feature based on design and task with enhanced retry logic.
 
         LLM Call Point 4: ~4KB Token
         Input: Design plan + Task + Precise context
@@ -104,6 +115,7 @@ class CodeGenerator:
             design: DesignPlan from requirement analyzer
             task: Specific task to implement
             context: Precise context (auto-extracted if not provided)
+            max_retries: Maximum number of retry attempts
 
         Returns:
             CodeImplementation with generated code
@@ -119,30 +131,45 @@ class CodeGenerator:
                 task_type="new_feature"
             )
 
-        if task.task_type == "modify_file" and not self.agent.file_exists(task.target_file):
-            raise FileNotFoundError(f"Workflow specified modification task for missing file: {task.target_file}")
+        # Validate task type matches file existence
+        if task.task_type == "modify_file":
+            if not self.agent.file_exists(task.target_file):
+                print(f"[INFO] Adjusted task type from 'modify_file' to 'create_file' for {task.target_file} (file doesn't exist)")
 
-        # Prepare prompt
-        prompt = self._build_implementation_prompt(design, task, context)
+        # Build enhanced prompt using new template
+        base_prompt = self._build_enhanced_implementation_prompt(design, task, context)
 
-        # Call LLM
+        # Use improved retry strategy
         if self.llm_provider:
-            response = self._call_llm(prompt, max_tokens=2000)
+            def llm_call(prompt: str) -> str:
+                return self._call_llm(prompt, max_tokens=2000)
 
-            if task.task_type == "modify_file" and not self.agent.file_exists(task.target_file):
-                raise ValueError(f"Target file {task.target_file} does not exist for modification task")
+            result = self.retry_strategy.generate_with_retry(
+                llm_call_func=llm_call,
+                base_prompt=base_prompt,
+                filename=task.target_file or '<string>',
+                previous_errors=None
+            )
 
-            implementation = self._parse_implementation_response(response, task)
+            if result['success']:
+                print(f"[INFO] Implementation succeeded on attempt {result['attempts']}")
+                if result['fixes_applied']:
+                    print(f"[INFO] Auto-fixes applied: {', '.join(result['fixes_applied'])}")
+
+                # Parse the successful code
+                implementation = self._create_implementation_from_code(
+                    code=result['code'],
+                    task=task
+                )
+                return implementation
+            else:
+                print(f"[ERROR] All {result['attempts']} attempts failed")
+                print(f"[ERROR] Errors: {result['errors'][-3:]}")  # Show last 3 errors
+                print(f"[WARN] Returning basic template")
+                return self._generate_template(task)
         else:
             # Fallback: Basic template
-            implementation = self._generate_template(task)
-
-        try:
-            compile(implementation.generated_code, task.target_file or '<string>', 'exec')
-        except SyntaxError as exc:
-            raise SyntaxError(f"Generated code for {task.target_file} failed to compile: {exc}")
-
-        return implementation
+            return self._generate_template(task)
 
     def modify_existing_code(
         self,
@@ -202,10 +229,11 @@ class CodeGenerator:
     def generate_tests(
         self,
         implementation: CodeImplementation,
-        test_type: str = "unit"
+        test_type: str = "unit",
+        max_retries: int = 3
     ) -> TestSuite:
         """
-        Generate test suite for implementation.
+        Generate test suite for implementation with retry logic.
 
         LLM Call Point 6: ~3KB Token
         Input: Implementation code + Interface definitions
@@ -214,29 +242,124 @@ class CodeGenerator:
         Args:
             implementation: CodeImplementation to test
             test_type: Type of tests ('unit', 'integration', 'both')
+            max_retries: Maximum number of retry attempts
 
         Returns:
             TestSuite with generated tests
         """
-        # Prepare prompt
-        prompt = self._build_test_prompt(implementation, test_type)
+        last_error = None
 
-        # Call LLM
-        if self.llm_provider:
-            response = self._call_llm(prompt, max_tokens=1500)
-            test_suite = self._parse_test_response(response, implementation)
-        else:
-            # Fallback: Basic test template
-            test_suite = self._generate_test_template(implementation)
+        for attempt in range(max_retries):
+            try:
+                # Prepare prompt
+                prompt = self._build_test_prompt(implementation, test_type)
 
-        try:
-            compile(test_suite.test_code, test_suite.test_file_path, 'exec')
-        except SyntaxError as exc:
-            raise SyntaxError(f"Generated tests for {test_suite.test_file_path} failed to compile: {exc}")
+                # Add retry context if this is a retry
+                if attempt > 0:
+                    prompt += f"\n\nPREVIOUS ATTEMPT FAILED: {last_error}\nPlease fix the issue and ensure valid JSON with proper escaping."
 
-        return test_suite
+                # Call LLM
+                if self.llm_provider:
+                    response = self._call_llm(prompt, max_tokens=1500)
+                    test_suite = self._parse_test_response(response, implementation)
+                else:
+                    # Fallback: Basic test template
+                    test_suite = self._generate_test_template(implementation)
+
+                # Validate syntax
+                try:
+                    compile(test_suite.test_code, test_suite.test_file_path, 'exec')
+                    print(f"[INFO] Test generation succeeded on attempt {attempt + 1}")
+                    return test_suite
+                except SyntaxError as exc:
+                    last_error = f"Syntax error: {exc}"
+                    print(f"[WARN] Test compilation failed on attempt {attempt + 1}: {exc}")
+
+                    # Try to fix common syntax errors
+                    fixed_code = self._fix_common_syntax_errors(test_suite.test_code)
+                    if fixed_code != test_suite.test_code:
+                        test_suite.test_code = fixed_code
+                        try:
+                            compile(test_suite.test_code, test_suite.test_file_path, 'exec')
+                            print(f"[INFO] Auto-fixed syntax error on attempt {attempt + 1}")
+                            return test_suite
+                        except:
+                            pass
+
+                    if attempt == max_retries - 1:
+                        raise SyntaxError(f"Generated tests for {test_suite.test_file_path} failed to compile after {max_retries} attempts: {exc}")
+
+            except Exception as e:
+                last_error = str(e)
+                print(f"[ERROR] Test generation attempt {attempt + 1} failed: {e}")
+                if attempt == max_retries - 1:
+                    # Final fallback: return basic template
+                    print(f"[WARN] All retry attempts failed, returning basic template")
+                    return self._generate_test_template(implementation)
+
+        # Should not reach here, but just in case
+        return self._generate_test_template(implementation)
 
     # ===== Prompt Building Methods =====
+
+    def _build_enhanced_implementation_prompt(
+        self,
+        design: DesignPlan,
+        task: Task,
+        context: Optional[PreciseContext]
+    ) -> str:
+        """Build enhanced prompt for new feature implementation using improved templates."""
+        context_str = self._format_context(context) if context else "No context available"
+        existing_paths = '\n'.join(sorted(self.agent.list_repo_files())[:50])
+
+        additional_requirements = f"""
+Design Plan:
+- Approach: {design.technical_approach}
+- New Components: {', '.join(c.get('name', '') for c in design.new_components)}
+
+Task Details:
+- Description: {task.description}
+- Type: {task.task_type}
+- Target File: {task.target_file or 'New file'}
+- Target Symbol: {task.target_symbol or 'N/A'}
+
+Context from Codebase:
+{context_str}
+
+Existing files for reference:
+{existing_paths}
+
+IMPORTANT:
+- Only generate code for file: {task.target_file}
+- Follow the existing code style and patterns from the context
+- Do not introduce new directories outside those listed above
+"""
+
+        return self.prompt_templates.get_code_generation_prompt(
+            task_description=task.description,
+            context=context_str,
+            file_path=task.target_file or "new_file.py",
+            additional_requirements=additional_requirements
+        )
+
+    def _create_implementation_from_code(
+        self,
+        code: str,
+        task: Task
+    ) -> CodeImplementation:
+        """Create CodeImplementation object from validated code."""
+        file_path = task.target_file
+        if not file_path or file_path == "unknown":
+            file_path = self._generate_default_file_path(task)
+
+        return CodeImplementation(
+            task=task,
+            generated_code=code,
+            file_path=file_path,
+            integration_notes=["Code generated with enhanced validation"],
+            imports_needed=[],
+            dependencies=[]
+        )
 
     def _build_implementation_prompt(
         self,
@@ -277,10 +400,26 @@ Please provide:
 3. Integration notes (how to integrate with existing code)
 4. Dependencies (other modules/functions needed)
 
-Respond ONLY with a JSON object. Do NOT wrap in markdown code blocks.
+CRITICAL INSTRUCTIONS FOR JSON FORMAT:
+- Respond ONLY with a JSON object
+- Do NOT wrap in markdown code blocks (no ```json or ```)
+- Escape ALL special characters in the "code" field:
+  * Use \\n for newlines (not actual newlines)
+  * Use \\" for quotes inside strings
+  * Use \\\\ for backslashes
+  * Use \\t for tabs
+- Ensure all docstrings use exactly three quotes (not four)
+- The entire code must be a single escaped string
+- Test your JSON is valid before responding
+
+ALTERNATIVE: If JSON escaping is too complex, you can also respond with a Python code block:
+```python
+# Your complete code here
+```
+
 Use this exact format:
 {{
-    "code": "your complete code here",
+    "code": "import os\\n\\ndef example():\\n    \\"\\"\\"Example function.\\"\\"\\"\\n    return True",
     "imports": ["import statement 1", "import statement 2"],
     "integration_notes": ["note 1", "note 2"],
     "dependencies": ["dependency 1", "dependency 2"]
@@ -360,10 +499,19 @@ Please provide:
 2. Test cases (description of each test)
 3. Coverage notes (what is tested and what might need manual testing)
 
-Respond ONLY with a JSON object. Do NOT wrap in markdown code blocks.
+CRITICAL INSTRUCTIONS:
+- Respond ONLY with a JSON object
+- Do NOT wrap in markdown code blocks (no ```json or ```)
+- Escape ALL special characters in strings:
+  * Use \\n for newlines (not actual newlines)
+  * Use \\" for quotes inside strings
+  * Use \\\\ for backslashes
+- Ensure all docstrings use exactly three quotes (not four)
+- Test your JSON is valid before responding
+
 Use this exact format:
 {{
-    "test_code": "your complete test code here",
+    "test_code": "import pytest\\n\\ndef test_example():\\n    \\"\\"\\"Test description.\\"\\"\\"\\n    assert True",
     "test_cases": [
         {{"name": "test_function_name", "description": "what it tests"}},
         {{"name": "test_another", "description": "what it tests"}}
@@ -383,22 +531,33 @@ Include edge cases and error handling tests.
         task: Task
     ) -> CodeImplementation:
         """Parse LLM response into CodeImplementation."""
+        # Try code block extraction first (more reliable)
+        code_from_block = self._extract_code_block(response)
+
         try:
             # Clean and extract JSON from response
             json_str = self._clean_json_response(response)
+            print(f"[DEBUG] Cleaned JSON string (first 300 chars): {json_str[:300]}")
+
             data = json.loads(json_str)
 
             # Extract code (handle both "code" and "generated_code" keys)
             code = data.get("code") or data.get("generated_code", "")
 
-            # If no code in JSON, try to extract code blocks from response
-            if not code:
-                code = self._extract_code_block(response)
+            # If no code in JSON but we found code block, use that
+            if not code and code_from_block:
+                print("[DEBUG] No code in JSON, using extracted code block")
+                code = code_from_block
 
             # Ensure we have a valid file path
             file_path = task.target_file
             if not file_path or file_path == "unknown":
                 file_path = self._generate_default_file_path(task)
+
+            print(f"[DEBUG] Successfully parsed implementation:")
+            print(f"  - File path: {file_path}")
+            print(f"  - Code length: {len(code)} chars")
+            print(f"  - Has code: {bool(code)}")
 
             return CodeImplementation(
                 task=task,
@@ -408,18 +567,31 @@ Include edge cases and error handling tests.
                 imports_needed=data.get("imports", []),
                 dependencies=data.get("dependencies", [])
             )
-        except Exception as e:
-            print(f"Failed to parse implementation response: {e}")
-            print(f"Response preview: {response[:200]}...")
-            # Try to extract code directly from response
-            code = self._extract_code_block(response)
-            if code:
+        except json.JSONDecodeError as e:
+            print(f"[WARN] JSON decode failed: {e}, falling back to code block extraction")
+            if code_from_block:
                 file_path = task.target_file or self._generate_default_file_path(task)
+                print(f"[INFO] Using extracted code block: {len(code_from_block)} chars")
                 return CodeImplementation(
                     task=task,
-                    generated_code=code,
+                    generated_code=code_from_block,
                     file_path=file_path,
-                    integration_notes=["Extracted from non-JSON response"],
+                    integration_notes=["Extracted from code block"],
+                    imports_needed=[],
+                    dependencies=[]
+                )
+            print("[ERROR] No code found in response")
+            return self._generate_template(task)
+        except Exception as e:
+            print(f"[ERROR] Unexpected error parsing implementation: {e}")
+            if code_from_block:
+                file_path = task.target_file or self._generate_default_file_path(task)
+                print(f"[INFO] Using extracted code block as fallback: {len(code_from_block)} chars")
+                return CodeImplementation(
+                    task=task,
+                    generated_code=code_from_block,
+                    file_path=file_path,
+                    integration_notes=["Extracted from code block (error fallback)"],
                     imports_needed=[],
                     dependencies=[]
                 )
@@ -589,41 +761,158 @@ Include edge cases and error handling tests.
         return response
 
     def _clean_json_response(self, response: str) -> str:
-        """Clean LLM response to extract valid JSON."""
+        """Clean LLM response to extract valid JSON with auto-repair."""
         import re
 
         # Remove markdown code blocks
         response = response.strip()
 
+        print(f"[DEBUG _clean_json] Original response length: {len(response)}")
+        print(f"[DEBUG _clean_json] First 200 chars: {response[:200]}")
+
         # Remove ```json and ``` markers (handle multiple variations)
-        response = re.sub(r'^```(?:json)?\s*', '', response)
-        response = re.sub(r'\s*```$', '', response)
+        # Use \A and \Z to match absolute start/end of string, not line boundaries
+        # This prevents accidentally removing content from within the JSON
+        response = re.sub(r'\A```(?:json)?\s*\n?', '', response)
+        response = re.sub(r'\n?\s*```\Z', '', response)
         response = response.strip()
 
+        print(f"[DEBUG _clean_json] After removing markers length: {len(response)}")
+        print(f"[DEBUG _clean_json] After removing markers first 200 chars: {response[:200]}")
+
         # Try to find JSON object with nested structures
-        # This pattern handles nested braces better
+        # This pattern handles nested braces better - but we need to be careful with strings
         brace_count = 0
         start_idx = -1
+        in_string = False
+        escape_next = False
 
         for i, char in enumerate(response):
-            if char == '{':
-                if brace_count == 0:
-                    start_idx = i
-                brace_count += 1
-            elif char == '}':
-                brace_count -= 1
-                if brace_count == 0 and start_idx != -1:
-                    # Found complete JSON object
-                    return response[start_idx:i+1]
+            # Handle string state
+            if escape_next:
+                escape_next = False
+                continue
 
-        # Fallback: try simple regex
+            if char == '\\':
+                escape_next = True
+                continue
+
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+
+            # Only count braces outside of strings
+            if not in_string:
+                if char == '{':
+                    if brace_count == 0:
+                        start_idx = i
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0 and start_idx != -1:
+                        # Found complete JSON object
+                        json_str = response[start_idx:i+1]
+                        # Validate it's actually JSON-like
+                        try:
+                            json.loads(json_str)
+                            print(f"[DEBUG _clean_json] Successfully found valid JSON via brace counting")
+                            return json_str
+                        except Exception as e:
+                            # Try to repair the JSON before giving up
+                            print(f"[DEBUG _clean_json] Brace counting found JSON-like structure but failed to parse: {str(e)[:100]}")
+                            repaired = self._try_repair_json(json_str)
+                            if repaired:
+                                print(f"[DEBUG _clean_json] Successfully repaired JSON")
+                                return repaired
+                            # Continue searching for other potential JSON objects
+                            start_idx = -1
+                            continue
+
+        print(f"[DEBUG _clean_json] Brace counting failed, trying regex fallback...")
+
+        # Fallback: try to find the largest JSON-like structure
+        # Look for patterns like {"key": "value", ...}
         json_obj_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
-        match = re.search(json_obj_pattern, response, re.DOTALL)
-        if match:
-            return match.group(0)
+        matches = re.findall(json_obj_pattern, response, re.DOTALL)
+        print(f"[DEBUG _clean_json] Regex found {len(matches)} potential JSON objects")
+
+        if matches:
+            # Try each match to see if it's valid JSON
+            for idx, match in enumerate(sorted(matches, key=len, reverse=True)):
+                try:
+                    json.loads(match)
+                    print(f"[DEBUG _clean_json] Successfully validated match #{idx} (length: {len(match)})")
+                    return match
+                except Exception as e:
+                    print(f"[DEBUG _clean_json] Match #{idx} failed validation: {e}")
+                    # Try to repair
+                    repaired = self._try_repair_json(match)
+                    if repaired:
+                        print(f"[DEBUG _clean_json] Successfully repaired match #{idx}")
+                        return repaired
+                    continue
 
         # Last resort: return as-is
+        print(f"[DEBUG _clean_json] All parsing attempts failed, returning as-is (length: {len(response)})")
         return response
+
+    def _try_repair_json(self, json_str: str) -> Optional[str]:
+        """Attempt to repair malformed JSON string."""
+        import re
+
+        try:
+            # Already valid
+            json.loads(json_str)
+            return json_str
+        except:
+            pass
+
+        # Common repair strategies
+        repairs = [
+            # Fix quadruple quotes in docstrings ("""" -> """)
+            lambda s: re.sub(r'"{4,}', '"""', s),
+
+            # Fix unescaped newlines in strings (but not \\n)
+            lambda s: self._fix_unescaped_newlines(s),
+
+            # Fix trailing commas before closing braces
+            lambda s: re.sub(r',(\s*[}\]])', r'\1', s),
+
+            # Fix missing commas between array/object elements
+            lambda s: re.sub(r'"\s*\n\s*"', '",\n"', s),
+        ]
+
+        for repair_fn in repairs:
+            try:
+                repaired = repair_fn(json_str)
+                json.loads(repaired)
+                return repaired
+            except:
+                continue
+
+        return None
+
+    def _fix_unescaped_newlines(self, json_str: str) -> str:
+        """Fix unescaped newlines within JSON string values."""
+        import re
+
+        # This is complex - we need to find string values and escape newlines
+        # Simple approach: find "key": "value" patterns and fix value
+        def fix_string_value(match):
+            key = match.group(1)
+            value = match.group(2)
+            # Escape unescaped newlines (not already \\n)
+            value = re.sub(r'(?<!\\)\\n', r'\\n', value)
+            # Escape unescaped quotes
+            value = re.sub(r'(?<!\\)"', r'\"', value)
+            return f'"{key}": "{value}"'
+
+        # Match "key": "value" where value might have issues
+        pattern = r'"([^"]+)":\s*"([^"]*)"'
+        try:
+            return re.sub(pattern, fix_string_value, json_str)
+        except:
+            return json_str
 
     def _generate_default_file_path(self, task: Task) -> str:
         """Generate a default file path when task doesn't have one."""
@@ -659,22 +948,87 @@ Include edge cases and error handling tests.
                 return "src/modified_module.py"
 
     def _extract_code_block(self, response: str) -> str:
-        """Extract code from markdown code blocks."""
+        """Extract code from response using multiple strategies."""
         import re
 
-        # Try to find Python code blocks
+        # Strategy 1: Extract from JSON "code" field (even if JSON is malformed)
+        # This handles cases where JSON parsing failed but the code field is intact
+        try:
+            # Match "code": "..." pattern with proper escape handling
+            # This regex handles escaped quotes and newlines within the string
+            code_pattern = r'"code"\s*:\s*"((?:[^"\\]|\\.)*)"'
+            match = re.search(code_pattern, response, re.DOTALL)
+            if match:
+                code_str = match.group(1)
+                # Unescape common escape sequences
+                code_str = code_str.replace('\\n', '\n')
+                code_str = code_str.replace('\\t', '\t')
+                code_str = code_str.replace('\\"', '"')
+                code_str = code_str.replace('\\\\', '\\')
+                # Verify it's substantial code (not just a placeholder)
+                if len(code_str) > 50 and ('def ' in code_str or 'class ' in code_str or 'import ' in code_str):
+                    print(f"[DEBUG] Extracted code from JSON 'code' field: {len(code_str)} chars")
+                    return code_str.strip()
+        except Exception as e:
+            print(f"[DEBUG] JSON field extraction failed: {e}")
+
+        # Strategy 2: Find Python code blocks in markdown
         code_pattern = r'```(?:python)?\s*(.*?)\s*```'
         matches = re.findall(code_pattern, response, re.DOTALL)
         if matches:
-            # Return the first/largest code block
-            return matches[0].strip()
+            # Return the longest code block (likely the main implementation)
+            longest = max(matches, key=len)
+            if len(longest) > 50:
+                print(f"[DEBUG] Extracted Python code block: {len(longest)} chars")
+                return longest.strip()
 
-        # If no code blocks, check if entire response looks like code
+        # Strategy 3: Check if entire response looks like code
         lines = response.strip().split('\n')
-        if len(lines) > 3 and any(line.strip().startswith(('def ', 'class ', 'import ', 'from ')) for line in lines):
-            return response.strip()
+        if len(lines) > 3:
+            code_indicators = ['def ', 'class ', 'import ', 'from ', 'async def', '@']
+            code_lines = [l for l in lines if any(l.strip().startswith(ind) for ind in code_indicators)]
+            # If at least 20% of lines are code indicators, treat as code
+            if len(code_lines) >= max(2, len(lines) * 0.2):
+                print(f"[DEBUG] Treating entire response as code: {len(response)} chars")
+                return response.strip()
 
+        print("[DEBUG] No code found in response")
         return ""
+
+    def _fix_common_syntax_errors(self, code: str) -> str:
+        """Attempt to fix common syntax errors in generated code."""
+        import re
+
+        original_code = code
+
+        # Fix 1: Quadruple quotes in docstrings ("""" -> """)
+        code = re.sub(r'"{4,}', '"""', code)
+
+        # Fix 2: Unterminated string literals - look for lines ending with odd number of quotes
+        lines = code.split('\n')
+        fixed_lines = []
+        for line in lines:
+            # Count unescaped quotes
+            quote_count = len(re.findall(r'(?<!\\)"', line))
+            # If odd number of quotes and line doesn't end with quote, might be unterminated
+            if quote_count % 2 == 1 and not line.rstrip().endswith('"'):
+                # Try to close the string
+                line = line.rstrip() + '"'
+            fixed_lines.append(line)
+        code = '\n'.join(fixed_lines)
+
+        # Fix 3: Missing colons after def/class/if/for/while/try/except/finally
+        code = re.sub(r'(def\s+\w+\s*\([^)]*\))\s*$', r'\1:', code, flags=re.MULTILINE)
+        code = re.sub(r'(class\s+\w+(?:\([^)]*\))?)\s*$', r'\1:', code, flags=re.MULTILINE)
+
+        # Fix 4: Extra quotes around docstrings that are already quoted
+        code = re.sub(r'""""{3,}', '"""', code)
+        code = re.sub(r"'''{3,}", "'''", code)
+
+        if code != original_code:
+            print(f"[DEBUG] Applied syntax fixes to code")
+
+        return code
 
     def _format_impact(self, impact_analysis: Any) -> str:
         """Format impact analysis for prompt."""
