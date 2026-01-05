@@ -1,3 +1,4 @@
+
 """
 Context Manager for AI Coding Agent.
 
