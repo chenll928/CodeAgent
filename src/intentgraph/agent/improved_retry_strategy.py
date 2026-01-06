@@ -155,22 +155,63 @@ class ImprovedRetryStrategy:
         return base_prompt + error_feedback
     
     def _extract_code(self, response: str) -> str:
-        """Extract code from LLM response."""
+        """Extract code from LLM response with improved pattern matching."""
         import re
-        
-        # Try to extract from code blocks
-        code_pattern = r'```(?:python)?\s*(.*?)\s*```'
-        matches = re.findall(code_pattern, response, re.DOTALL)
-        if matches:
-            return max(matches, key=len).strip()
-        
-        # If no code blocks, check if entire response is code
+
+        # Strategy 1: Try Python code blocks with various formats
+        patterns = [
+            r'```python\s*\n(.*?)\n```',  # ```python\n...\n```
+            r'```python\s+(.*?)```',       # ```python ...```
+            r'```py\s*\n(.*?)\n```',       # ```py\n...\n```
+            r'```\s*\n(.*?)\n```',         # ```\n...\n```
+            r'```(.*?)```',                # ```...```
+        ]
+
+        for pattern in patterns:
+            matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
+            if matches:
+                # Get the longest match (most likely to be the actual code)
+                code = max(matches, key=len).strip()
+                if code and len(code) > 10:  # Ensure it's not just a snippet
+                    return code
+
+        # Strategy 2: Look for code without markdown blocks
+        # Find lines that look like Python code
         lines = response.strip().split('\n')
-        code_indicators = ['def ', 'class ', 'import ', 'from ', 'async def', '@']
+        code_indicators = ['def ', 'class ', 'import ', 'from ', 'async def', '@', 'if __name__']
+
+        # Find the first line that looks like code
+        start_idx = None
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if any(stripped.startswith(ind) for ind in code_indicators):
+                start_idx = i
+                break
+
+        if start_idx is not None:
+            # Extract from first code line to end (or until we hit non-code)
+            code_lines = []
+            for line in lines[start_idx:]:
+                # Stop if we hit markdown or explanatory text
+                if line.strip().startswith('#') and len(line.strip()) > 50:
+                    # Long comments might be explanations, not code comments
+                    continue
+                if line.strip() and not line.strip().startswith(('def', 'class', 'import', 'from', '@', ' ', '\t', '#', 'if', 'else', 'elif', 'for', 'while', 'try', 'except', 'finally', 'with', 'return', 'yield', 'async', 'await')):
+                    # Looks like prose, stop here
+                    break
+                code_lines.append(line)
+
+            if code_lines:
+                code = '\n'.join(code_lines).strip()
+                # Validate it has enough code content
+                code_line_count = sum(1 for l in code_lines if l.strip() and not l.strip().startswith('#'))
+                if code_line_count >= 2:
+                    return code
+
+        # Strategy 3: If response is mostly code, return it all
         code_lines = [l for l in lines if any(l.strip().startswith(ind) for ind in code_indicators)]
-        
         if len(code_lines) >= max(2, len(lines) * 0.2):
             return response.strip()
-        
+
         return ""
 

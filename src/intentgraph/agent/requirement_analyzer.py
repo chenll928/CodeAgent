@@ -113,45 +113,24 @@ class RequirementAnalyzer:
         if analysis:
             repo_root = Path(analysis.root)
             for file_info in analysis.files:
-                file_path = (repo_root / Path(file_info.path)).as_posix()
-                self._repo_files.add(file_path)
-                module_root = file_path.split('/')[:2]
+                # FIX: Store relative path instead of absolute path for consistent comparison
+                rel_path = Path(file_info.path).as_posix()
+                self._repo_files.add(rel_path)
+                module_root = rel_path.split('/')[:2]
                 if module_root:
                     self._module_roots.add('/'.join(module_root))
         else:
             repo_root = self.agent.repo_path
             for file_path in repo_root.rglob('*.py'):
+                # FIX: Store relative path instead of absolute path
                 rel_path = file_path.relative_to(repo_root).as_posix()
-                self._repo_files.add((repo_root / rel_path).as_posix())
+                self._repo_files.add(rel_path)
                 parts = rel_path.split('/')
                 if parts:
                     self._module_roots.add('/'.join(parts[:2]))
 
         self._index_initialized = True
-
-        try:
-            analysis = self.agent.get_repository_manifest()
-        except AttributeError:
-            analysis = None
-
-        if analysis:
-            repo_root = Path(analysis.root)
-            for file_info in analysis.files:
-                file_path = (repo_root / Path(file_info.path)).as_posix()
-                self._repo_files.add(file_path)
-                module_root = file_path.split('/')[:2]
-                if module_root:
-                    self._module_roots.add('/'.join(module_root))
-        else:
-            repo_root = self.agent.repo_path
-            for file_path in repo_root.rglob('*.py'):
-                rel_path = file_path.relative_to(repo_root).as_posix()
-                self._repo_files.add((repo_root / rel_path).as_posix())
-                parts = rel_path.split('/')
-                if parts:
-                    self._module_roots.add('/'.join(parts[:2]))
-
-        self._index_initialized = True
+        print(f"[DEBUG] Indexed {len(self._repo_files)} files from repository")
 
     def analyze_requirement(
         self,
@@ -247,7 +226,7 @@ class RequirementAnalyzer:
             dependency_info: Dependency information from codebase
 
         Returns:
-            List of Tasks with dependencies and priorities
+            List of Tasks with dependencies and priorities (deduplicated)
         """
         self._ensure_repo_index()
 
@@ -266,7 +245,56 @@ class RequirementAnalyzer:
             # Fallback: Basic task decomposition
             tasks = self._heuristic_decomposition(design)
 
+        # Deduplicate tasks by target_file
+        tasks = self._deduplicate_tasks(tasks)
+
         return tasks
+
+    def _deduplicate_tasks(self, tasks: List[Task]) -> List[Task]:
+        """Remove duplicate tasks targeting the same file."""
+        seen_files = set()
+        deduplicated = []
+
+        for task in tasks:
+            if task.target_file not in seen_files:
+                deduplicated.append(task)
+                seen_files.add(task.target_file)
+            else:
+                print(f"[INFO] Skipping duplicate task for {task.target_file}: {task.description}")
+
+        return deduplicated
+
+    def _normalize_file_path(self, component_name: str, component_type: str, module_name: str = None) -> str:
+        """
+        Normalize file path according to Python conventions.
+
+        Rules:
+        1. Use snake_case for file names
+        2. Organize by module: src/<module>/<file>.py
+        3. Follow PEP 8 naming conventions
+
+        Args:
+            component_name: Component name (e.g., "AuthService", "UserModel")
+            component_type: Type of component ("class", "module", etc.)
+            module_name: Optional module name (e.g., "auth", "api")
+
+        Returns:
+            Normalized file path (e.g., "src/auth/auth_service.py")
+        """
+        # Convert CamelCase to snake_case
+        # Insert underscore before uppercase letters (except first)
+        file_name = re.sub(r'(?<!^)(?=[A-Z])', '_', component_name).lower()
+
+        # Determine module name if not provided
+        if not module_name:
+            # Extract uppercase letters (e.g., AuthService -> AS -> as)
+            module_name = ''.join(c for c in component_name if c.isupper()).lower()
+            if not module_name or len(module_name) < 2:
+                # Fallback: use first word (e.g., auth_service -> auth)
+                module_name = file_name.split('_')[0]
+
+        # Build path
+        return f"src/{module_name}/{file_name}.py"
 
     # ===== Helper Methods =====
 
@@ -379,9 +407,17 @@ Respond in JSON format with these fields.
         design: DesignPlan,
         dependency_info: Dict[str, Any]
     ) -> str:
-        """Build prompt for task decomposition."""
+        """Build prompt for task decomposition with strict file path constraints."""
         # Extract component names for file path generation
         new_component_names = [c.get('name', '') for c in design.new_components]
+
+        # Format pre-defined file paths
+        predefined_paths = []
+        for comp in design.new_components:
+            name = comp.get('name', '')
+            file = comp.get('file', '')
+            desc = comp.get('description', '')
+            predefined_paths.append(f"  - {name}: {file} ({desc})")
 
         prompt = f"""Decompose the following design plan into executable tasks.
 
@@ -389,37 +425,39 @@ Design Plan:
 - Approach: {design.technical_approach}
 - New Components: {', '.join(new_component_names)}
 - Modified Components: {len(design.modified_components)}
-- Steps: {len(design.implementation_steps)}
 
 Implementation Steps:
 {chr(10).join(f"{i+1}. {step}" for i, step in enumerate(design.implementation_steps))}
 
-IMPORTANT: For each task, you MUST specify a concrete target_file path.
-- For new components, use pattern: src/<module_name>/<component_name>.py and ensure <module_name> exists in {sorted(self._module_roots)}
-- For modifications, specify the exact file path to modify and ensure it matches one of {sorted(self._repo_files)[:30]}
+🔴 CRITICAL FILE PATH RULES (MUST FOLLOW EXACTLY):
+1. Use snake_case for ALL file names (e.g., auth_service.py, NOT AuthService.py)
+2. You MUST use these EXACT pre-defined file paths:
+{chr(10).join(predefined_paths)}
 
-CRITICAL: DO NOT generate any test-related tasks (add_test). Test generation will be handled separately.
-Focus ONLY on implementation tasks: create_file, modify_file, add_function, modify_function.
+3. Each task creates ONE file with ONE of the above paths
+4. NO duplicate target_file values
+5. Focus ONLY on implementation, NOT analysis or documentation
+6. DO NOT generate test-related tasks (add_test) - tests handled separately
 
-Please decompose into tasks with:
-1. Task ID: Unique identifier (e.g., "task_1", "task_2")
-2. Description: What to do
-3. Task Type: ONLY use (create_file, modify_file, add_function, modify_function) - NO test tasks
-4. Target File: REQUIRED - Concrete file path (e.g., "src/analyzer/requirement_parser.py")
-5. Target Symbol: Function/class to work on (if applicable)
-6. Dependencies: Other task IDs this depends on
-7. Priority: 0-10 (higher = more important)
-8. Estimated Tokens: Estimated LLM tokens needed
+Task Requirements:
+- Task ID: Unique identifier (e.g., "task_1", "task_2")
+- Description: What to implement (be specific)
+- Task Type: ONLY use (create_file, modify_file, add_function, modify_function)
+- Target File: MUST be one of the exact paths listed above
+- Target Symbol: Class/function name to create
+- Dependencies: Other task IDs this depends on
+- Priority: 0-10 (higher = more important)
+- Estimated Tokens: Estimated LLM tokens needed
 
 Respond ONLY with a JSON array of tasks. Do NOT wrap in markdown code blocks.
 Example format:
 [
   {{
     "task_id": "task_1",
-    "description": "Create requirement parser",
+    "description": "Create UserModel class with password hashing",
     "task_type": "create_file",
-    "target_file": "src/analyzer/requirement_parser.py",
-    "target_symbol": "RequirementParser",
+    "target_file": "src/auth/user_model.py",
+    "target_symbol": "UserModel",
     "dependencies": [],
     "priority": 10,
     "estimated_tokens": 4000
@@ -508,18 +546,26 @@ Example format:
                 # If LLM says modify_file but file doesn't exist, change to create_file
                 if task_type == "modify_file":
                     normalized_file = validated_file.replace('\\', '/').lstrip('/')
+                    print(f"[DEBUG] Checking modify_file: {normalized_file}")
+                    print(f"[DEBUG] File in repo: {normalized_file in self._repo_files}")
                     if normalized_file not in self._repo_files:
                         # File doesn't exist, should be create_file
                         task_type = "create_file"
                         print(f"[INFO] Adjusted task type from 'modify_file' to 'create_file' for {validated_file} (file doesn't exist)")
+                    else:
+                        print(f"[INFO] File {normalized_file} exists, keeping task_type='modify_file'")
 
                 # If LLM says create_file but file exists, change to modify_file
                 elif task_type == "create_file":
                     normalized_file = validated_file.replace('\\', '/').lstrip('/')
+                    print(f"[DEBUG] Checking create_file: {normalized_file}")
+                    print(f"[DEBUG] File in repo: {normalized_file in self._repo_files}")
                     if normalized_file in self._repo_files:
                         # File exists, should be modify_file
                         task_type = "modify_file"
                         print(f"[INFO] Adjusted task type from 'create_file' to 'modify_file' for {validated_file} (file exists)")
+                    else:
+                        print(f"[INFO] File {normalized_file} doesn't exist, keeping task_type='create_file'")
 
                 tasks.append(Task(
                     task_id=task_data.get("task_id", f"task_{i}"),
@@ -589,51 +635,186 @@ Example format:
         )
 
     def _heuristic_design(self, analysis: RequirementAnalysis) -> DesignPlan:
-        """Fallback design without LLM."""
+        """Fallback design without LLM - generates concrete implementation plan."""
+        # Extract meaningful component names from requirement
+        requirement_lower = analysis.requirement_text.lower()
+
+        # Determine component name based on requirement keywords
+        component_name = None
+        component_type = "module"
+
+        # Common patterns for feature requirements
+        if "登录" in requirement_lower or "login" in requirement_lower:
+            component_name = "auth"
+            new_components = [
+                {
+                    "name": "AuthService",
+                    "type": "class",
+                    "file": self._normalize_file_path("AuthService", "class", "auth"),
+                    "description": "Authentication service with login/logout methods"
+                },
+                {
+                    "name": "UserModel",
+                    "type": "class",
+                    "file": self._normalize_file_path("UserModel", "class", "auth"),
+                    "description": "User model with password hashing"
+                }
+            ]
+            steps = [
+                "Create UserModel class with username, email, hashed_password fields",
+                "Create AuthService class with login, logout, validate_password methods",
+                "Add password hashing using bcrypt or similar"
+            ]
+        elif "注册" in requirement_lower or "register" in requirement_lower:
+            component_name = "registration"
+            new_components = [
+                {
+                    "name": "RegistrationService",
+                    "type": "class",
+                    "file": self._normalize_file_path("RegistrationService", "class", "registration"),
+                    "description": "User registration service"
+                }
+            ]
+            steps = ["Create registration service", "Add user validation"]
+        elif "api" in requirement_lower or "接口" in requirement_lower:
+            component_name = "api"
+            new_components = [
+                {
+                    "name": "APIHandler",
+                    "type": "class",
+                    "file": self._normalize_file_path("APIHandler", "class", "api"),
+                    "description": "API request handler"
+                }
+            ]
+            steps = ["Create API handler", "Add endpoint routing"]
+        else:
+            # Generic feature - use key entities
+            if analysis.key_entities:
+                component_name = analysis.key_entities[0].lower().replace(" ", "_")
+            else:
+                component_name = "feature"
+
+            new_components = [
+                {
+                    "name": f"{component_name.title()}Service",
+                    "type": "class",
+                    "file": self._normalize_file_path(f"{component_name.title()}Service", "class", component_name),
+                    "description": f"{component_name} service implementation"
+                }
+            ]
+            steps = [f"Implement {component_name} functionality"]
+
         return DesignPlan(
             requirement_analysis=analysis,
-            technical_approach="Implement based on requirement analysis",
-            implementation_steps=["Analyze requirement", "Implement solution", "Add tests"]
+            technical_approach=f"Implement {component_name} feature with modular design",
+            new_components=new_components,
+            implementation_steps=steps
         )
 
     def _heuristic_decomposition(self, design: DesignPlan) -> List[Task]:
-        """Fallback task decomposition without LLM."""
+        """Fallback task decomposition without LLM - generates concrete tasks."""
         tasks = []
+        task_id_counter = 0
 
-        # Generate tasks from new components
-        for i, component in enumerate(design.new_components):
-            component_name = component.get('name', f'component_{i}')
-            component_type = component.get('type', 'module')
+        # Generate tasks from new components (preferred approach)
+        if design.new_components:
+            for component in design.new_components:
+                component_name = component.get('name', f'component_{task_id_counter}')
+                component_type = component.get('type', 'class')
 
-            # Generate appropriate file path
-            if component_type == 'class':
-                file_path = f"src/{component_name.lower()}.py"
-            elif component_type == 'module':
-                file_path = f"src/{component_name.lower()}/{component_name.lower()}.py"
-            else:
-                file_path = f"src/{component_name.lower()}.py"
+                # Use file path from component if available
+                file_path = component.get('file')
+                if not file_path:
+                    # Generate appropriate file path based on type
+                    if component_type == 'class':
+                        # Extract module name from component name (e.g., AuthService -> auth)
+                        module_name = ''.join(c for c in component_name if c.isupper()).lower()
+                        if not module_name:
+                            module_name = component_name.lower()
+                        file_path = f"src/{module_name}/{component_name.lower()}.py"
+                    elif component_type == 'module':
+                        file_path = f"src/{component_name.lower()}/{component_name.lower()}.py"
+                    else:
+                        file_path = f"src/{component_name.lower()}.py"
+
+                tasks.append(Task(
+                    task_id=f"task_{task_id_counter}",
+                    description=f"Create {component_name} {component_type}",
+                    task_type="create_file",
+                    target_file=file_path,
+                    target_symbol=component_name,
+                    priority=len(design.new_components) - task_id_counter,
+                    estimated_tokens=4000
+                ))
+                task_id_counter += 1
+
+        # If no new components but have implementation steps, try to extract meaningful tasks
+        elif design.implementation_steps:
+            # Try to extract concrete actions from steps
+            for i, step in enumerate(design.implementation_steps):
+                step_lower = step.lower()
+
+                # Skip abstract steps
+                if any(skip in step_lower for skip in ["analyze", "document", "add tests", "test"]):
+                    continue
+
+                # Try to extract component name from step
+                component_name = self._extract_component_name(step)
+                if not component_name:
+                    component_name = f"feature_{i}"
+
+                # Determine task type and file path
+                if "create" in step_lower or "implement" in step_lower:
+                    task_type = "create_file"
+                    file_path = f"src/{component_name.lower()}.py"
+                elif "modify" in step_lower or "update" in step_lower:
+                    task_type = "modify_file"
+                    # Try to find existing file
+                    file_path = self._find_best_match_file(component_name)
+                    if not file_path:
+                        file_path = f"src/{component_name.lower()}.py"
+                else:
+                    task_type = "create_file"
+                    file_path = f"src/{component_name.lower()}.py"
+
+                tasks.append(Task(
+                    task_id=f"task_{task_id_counter}",
+                    description=step,
+                    task_type=task_type,
+                    target_file=file_path,
+                    target_symbol=component_name,
+                    priority=len(design.implementation_steps) - i,
+                    estimated_tokens=4000
+                ))
+                task_id_counter += 1
+
+        # Fallback: create at least one task
+        if not tasks:
+            requirement_text = design.requirement_analysis.requirement_text
+            component_name = self._extract_component_name(requirement_text) or "feature"
 
             tasks.append(Task(
-                task_id=f"task_{i}",
-                description=f"Create {component_name}",
+                task_id="task_0",
+                description=f"Implement {requirement_text}",
                 task_type="create_file",
-                target_file=file_path,
-                target_symbol=component_name,
-                priority=len(design.new_components) - i
+                target_file=f"src/{component_name.lower()}.py",
+                target_symbol=component_name.title(),
+                priority=10,
+                estimated_tokens=4000
             ))
 
-        # If no new components, use implementation steps
-        if not tasks:
-            for i, step in enumerate(design.implementation_steps):
-                tasks.append(Task(
-                    task_id=f"task_{i}",
-                    description=step,
-                    task_type="modify_file",
-                    target_file=f"src/implementation_{i}.py",
-                    priority=len(design.implementation_steps) - i
-                ))
-
         return tasks
+
+    def _find_best_match_file(self, component_name: str) -> Optional[str]:
+        """Find best matching file for a component name."""
+        component_lower = component_name.lower()
+
+        # Direct match
+        for file_path in self._repo_files:
+            if component_lower in file_path.lower():
+                return file_path
+
+        return None
 
     def _find_similar_implementations(self, analysis: RequirementAnalysis) -> List[Dict[str, Any]]:
         """Find similar implementations in codebase."""
