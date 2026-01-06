@@ -21,14 +21,8 @@ from .requirement_analyzer import (
     Task,
 )
 
-from .code_generator import (
-    CodeImplementation,
-    CodeModification,
-    TestSuite,
-)
-
 # Import enhanced version (this is what's actually used)
-from .enhanced_code_generator import EnhancedCodeGenerator
+from .enhanced_code_generator import EnhancedCodeGenerator, CodeImplementation, CodeModification, TestSuite
 
 # For backward compatibility, also expose as CodeGenerator
 CodeGenerator = EnhancedCodeGenerator

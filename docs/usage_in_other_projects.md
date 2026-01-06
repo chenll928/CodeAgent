@@ -9,6 +9,7 @@
 cd E:\cll\ai\modelLearn\agentCoder
 uv venv
 uv pip install -e E:\cll\ai\modelLearn\CodeAgent
+ .venv\Scripts\activate
 
 cd /path/to/CodeAgent
 uv pip install -e .
